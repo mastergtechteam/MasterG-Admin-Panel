@@ -34,18 +34,28 @@ const AppSidebar = () => {
         dispatch({ type: 'set', sidebarShow: visible })
       }}
     >
-      <CSidebarHeader className="border-bottom">
-        <CSidebarBrand to="/">
-        <img src={logo} className="sidebar-brand-full" height={32} alt="logo" />
-        <CIcon customClassName="sidebar-brand-narrow" icon={sygnet} height={32} />
-
-        </CSidebarBrand>
-        <CCloseButton
-          className="d-lg-none"
-          dark
-          onClick={() => dispatch({ type: 'set', sidebarShow: false })}
+     <CSidebarHeader className="border-bottom d-flex justify-content-center align-items-center">
+      <CSidebarBrand to="/" className="mx-auto text-center">
+        <img
+          src={logo}
+          className="sidebar-brand-full"
+          height={32}
+          alt="logo"
         />
-      </CSidebarHeader>
+        <CIcon
+          customClassName="sidebar-brand-narrow"
+          icon={sygnet}
+          height={32}
+        />
+      </CSidebarBrand>
+
+      <CCloseButton
+        className="d-lg-none position-absolute end-0 me-2"
+        dark
+        onClick={() => dispatch({ type: 'set', sidebarShow: false })}
+      />
+    </CSidebarHeader>
+
       <AppSidebarNav items={navigation} />
       <CSidebarFooter className="border-top d-none d-lg-flex">
         <CSidebarToggler
