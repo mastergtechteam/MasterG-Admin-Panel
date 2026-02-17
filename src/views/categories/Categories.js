@@ -3,12 +3,24 @@ import {
   CTable, CTableHead, CTableRow, CTableHeaderCell,
   CTableBody, CTableDataCell, CBadge,
   CPagination, CPaginationItem, CSpinner, CAvatar, CButton, CModal, CModalHeader, CModalTitle, CFormSwitch,
-  CModalBody, CModalFooter, CFormInput, CFormSelect
+  CModalBody, CModalFooter, CFormInput, CFormSelect,
+  CDropdown,
+  CDropdownToggle,
+  CDropdownMenu,
+  CDropdownItem
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilTags, cilTrash, cilZoom, cilPencil } from '@coreui/icons'
+import { cilTags, cilTrash, cilZoom, cilPencil,  cilCloudDownload,
+    cilPlus } from '@coreui/icons'
 
 import { getCategories, deleteCategory, updateCategory, createCategory, toggleCategoryStatus } from '../../services/categoryService'
+import { uploadToS3 } from '../../utils/fileUpload'
+
+import {
+    exportToCSV,
+    exportToExcel,
+    exportToPDF
+  } from '../../utils/exportUtils'
 
 const Categories = () => {
   const [categories, setCategories] = useState([])
@@ -18,11 +30,28 @@ const Categories = () => {
   const [visible, setVisible] = useState(false)
   const [isEdit, setIsEdit] = useState(false)
   const [editId, setEditId] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
     name: '',
     image: '',
     status: 'ACTIVE'
  })
+
+ const formatDate = (d) =>
+    new Date(d).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    })
+
+    const exportData = categories.map(c => ({
+        Category_ID: c.categoryId,
+        Name: c.name,
+        Status: c.status,
+        Created_At: formatDate(c.createdAt)
+      }))
+      
+  
 
  const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -130,18 +159,80 @@ const handleToggle = async (cat) => {
     if (ok) fetchCategories()
   }
 
-
+  const handleFileUpload = async (file) => {
+    if (!file) return
+  
+    setUploading(true)
+    try {
+      const imageUrl = await uploadToS3(
+        file,
+        `categories/${Date.now()}`
+      )
+  
+      setForm(prev => ({ ...prev, image: imageUrl }))
+    } catch (err) {
+      alert(err.message)
+    }
+    setUploading(false)
+  }
   
 
   if (loading) return <CSpinner color="primary" />
 
   return (
     <>
-    <div className="d-flex justify-content-end mb-3">
-        <CButton color="primary" onClick={() => setVisible(true)}>
-            + Add Category
-        </CButton>
-    </div>
+    <div className="d-flex justify-content-between align-items-center mb-3">
+
+{/* LEFT */}
+<h5 className="mb-0 fw-semibold">Categories</h5>
+
+{/* RIGHT */}
+<div className="d-flex gap-2">
+
+  {/* EXPORT DROPDOWN */}
+  <CDropdown>
+    <CDropdownToggle color="light" size="sm" className="border">
+      <CIcon icon={cilCloudDownload} className="me-1" />
+      Export
+    </CDropdownToggle>
+
+    <CDropdownMenu>
+      <CDropdownItem
+        onClick={() => exportToExcel(exportData, "Categories")}
+      >
+        📗 Export Excel
+      </CDropdownItem>
+
+      <CDropdownItem
+        onClick={() => exportToCSV(exportData, "Categories")}
+      >
+        📄 Export CSV
+      </CDropdownItem>
+
+      <CDropdownItem
+        onClick={() => {
+          if (!exportData.length) return alert("No data to export")
+          exportToPDF(
+            Object.keys(exportData[0]),
+            exportData,
+            "Categories Report"
+          )
+        }}
+      >
+        📕 Export PDF
+      </CDropdownItem>
+    </CDropdownMenu>
+  </CDropdown>
+
+  {/* ADD CATEGORY */}
+  <CButton color="primary" size="sm" onClick={() => setVisible(true)}>
+    <CIcon icon={cilPlus} className="me-1" />
+    Add Category
+  </CButton>
+
+</div>
+</div>
+
 
       <CTable align="middle" className="mb-0 border" hover responsive>
         <CTableHead>
@@ -237,13 +328,37 @@ const handleToggle = async (cat) => {
       className="mb-3"
     />
 
-    <CFormInput
-      label="Image URL"
-      name="image"
-      value={form.image}
-      onChange={handleChange}
-      className="mb-3"
-    />
+{/* CATEGORY IMAGE UPLOAD BLOCK */}
+<div className="mb-4">
+
+  <CFormInput
+    type="file"
+    label="Category Image"
+    accept="image/*"
+    onChange={(e) => handleFileUpload(e.target.files[0])}
+  />
+
+  {uploading && (
+    <div className="mt-1">
+      <small className="text-primary">Uploading image...</small>
+    </div>
+  )}
+
+  {form.image && (
+    <div className="mt-2">
+      <img
+        src={form.image}
+        alt="category"
+        className="rounded border"
+        style={{ width: '120px', height: '120px', objectFit: 'cover' }}
+      />
+    </div>
+  )}
+
+</div>
+
+
+
 
     <CFormSelect
       label="Status"

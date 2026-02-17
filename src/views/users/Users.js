@@ -45,6 +45,35 @@ const Users = () => {
     fetchUsers()
   }
 
+  const handleAdminConfirm = async (user) => {
+    try {
+      const body = user.email
+        ? { email: user.email }
+        : { phone_number: user.phoneNumber }
+  
+      const res = await fetch(`${config.BASE_URL}/auth/admin-confirm`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+  
+      const data = await res.json()
+  
+      if (res.ok) {
+        alert("User confirmed successfully")
+        fetchUsers() // Refresh table
+      } else {
+        alert(data.message || "Something went wrong")
+      }
+    } catch (error) {
+      console.error(error)
+      alert("Server error")
+    }
+  }
+  
+
   if (loading) return <CSpinner color="primary" />
 
   return (
@@ -111,7 +140,18 @@ const Users = () => {
               <CTableDataCell>{formatDate(user.createdAt)}</CTableDataCell>
 
               <CTableDataCell className="text-center">
-                <CIcon icon={cilZoom} className="me-3 cursor-pointer" />
+                {/* <CIcon icon={cilZoom} className="me-3 cursor-pointer" /> */}
+
+                {user.status !== "CONFIRMED" && (
+                    <CBadge
+                    color="primary"
+                    style={{ cursor: "pointer" }}
+                    className="cursor-pointer"
+                    onClick={() => handleAdminConfirm(user)}
+                    >
+                    Admin Confirm
+                    </CBadge>
+                )}
                 <CIcon
                   icon={cilTrash}
                   className="text-danger cursor-pointer"
