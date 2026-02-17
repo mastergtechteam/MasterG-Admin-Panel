@@ -17,7 +17,7 @@ export const uploadToS3 = async (file,fileName) => {
   const base64Content = await fileToBase64(file)
 
   const res = await fetch(
-    `https://2a0t2oahs8.execute-api.ap-south-1.amazonaws.com/utils/upload`,
+    `https://uus4hd8rt5.execute-api.ap-south-1.amazonaws.com/utils/upload`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
