@@ -39,10 +39,17 @@ const Products = () => {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const perPage = 10
+  const [pageSize, setPageSize] = useState(10)
+  const [lastKey, setLastKey] = useState(null)
+  const [hasMore, setHasMore] = useState(true)
 
   const [visible, setVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(null)
+
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [filteredProducts, setFilteredProducts] = useState([])
+
 
   const [isEdit, setIsEdit] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -64,7 +71,19 @@ const Products = () => {
       second: "2-digit",
     })
 
-    const exportData = products.map(p => ({
+    // const exportData = products.map(p => ({
+    //     Product_ID: p.productId,
+    //     Name: p.name,
+    //     Brand: p.brand,
+    //     Category: p.category?.name,
+    //     Selling_Price: p.pricing?.sellingPrice,
+    //     MRP: p.pricing?.mrp,
+    //     Stock: p.stock?.availableQuantity,
+    //     Status: p.status,
+    //     Created_At: formatIST(p.createdAt)
+    //   }))
+
+    const exportData = filteredProducts.map(p => ({
         Product_ID: p.productId,
         Name: p.name,
         Brand: p.brand,
@@ -75,6 +94,7 @@ const Products = () => {
         Status: p.status,
         Created_At: formatIST(p.createdAt)
       }))
+      
   
 
     const [form, setForm] = useState({
@@ -126,17 +146,51 @@ const Products = () => {
       })
      
       
-  const fetchProducts = async () => {
-    setLoading(true)
-    const data = await getProducts()
-    setProducts(data.filter(p => !p.isDeleted))
-    setLoading(false)
-  }
+      const fetchProducts = async () => {
+        setLoading(true)
+      
+        let allProducts = []
+        let nextKey = null
+      
+        do {
+          const res = await getProducts({
+            pageSize: 100,   
+            lastKey: nextKey
+          })
+      
+          if (res?.success) {
+            allProducts = [...allProducts, ...res.data]
+            nextKey = res.pagination?.nextPageKey || null
+          } else {
+            nextKey = null
+          }
+        } while (nextKey)
+      
+        setProducts(allProducts)
+        setFilteredProducts(allProducts)
+        setLoading(false)
+      }
+      
+      
 
   const fetchCategories = async () => {
     const data = await getCategories()
     setCategories(data.filter(c => !c.isDeleted))
   }
+
+  const handleCategoryFilter = (categoryId) => {
+    setSelectedCategory(categoryId)
+    setPage(1) // pagination reset
+  
+    if (!categoryId) {
+      setFilteredProducts(products)
+    } else {
+      setFilteredProducts(
+        products.filter(p => p.category?.categoryId === categoryId)
+      )
+    }
+  }
+  
 
   useEffect(() => {
     fetchProducts()
@@ -303,7 +357,13 @@ const Products = () => {
     if (ok) fetchProducts()
   }
 
-  const current = products.slice((page - 1) * perPage, page * perPage)
+//   const current = products.slice((page - 1) * perPage, page * perPage)
+
+const current = filteredProducts.slice(
+    (page - 1) * perPage,
+    page * perPage
+  )
+  
 
   const handleQuantityChange = (e) => {
     const { name, value } = e.target
@@ -315,6 +375,57 @@ const Products = () => {
       }
     })
   }
+
+  const extractS3Key = (url) => {
+    try {
+      return url.split(".amazonaws.com/")[1] || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isS3Image = (url) => {
+    return (
+      url.includes(".amazonaws.com/") &&
+      (
+        url.includes("masterg-dev") ||
+        url.includes("masterg") ||
+        url.includes(process.env.REACT_APP_S3_BUCKET || "")
+      )
+    );
+  };
+
+  const handleDeleteImage = async (imageUrl, index) => {
+    if (!window.confirm("Are you sure you want to delete this image?")) return;
+  
+    try {
+      // 🔍 Check S3 or not
+      if (isS3Image(imageUrl)) {
+        const s3Key = extractS3Key(imageUrl);
+  
+        if (s3Key) {
+          await fetch(
+            `${config.BASE_URL}/utils/files?s3Key=${encodeURIComponent(s3Key)}`,
+            { method: "DELETE" }
+          );
+        }
+      }
+  
+      // 🧹 Always remove from DynamoDB (state)
+      const updatedImages = form.images.filter((_, i) => i !== index);
+  
+      setForm(prev => ({
+        ...prev,
+        images: updatedImages.length ? updatedImages : [""]
+      }));
+  
+    } catch (error) {
+      console.error("Image delete failed:", error);
+      alert("Failed to delete image");
+    }
+  };
+  
+  
   
   
   const handleStockChange = (e) =>
@@ -355,6 +466,21 @@ const Products = () => {
 
 {/* RIGHT: Actions */}
 <div className="d-flex gap-2">
+
+<CFormSelect
+  size="sm"
+  value={selectedCategory}
+  onChange={(e) => handleCategoryFilter(e.target.value)}
+  className="w-auto"
+>
+  <option value="">All Categories</option>
+  {categories.map(c => (
+    <option key={c.categoryId} value={c.categoryId}>
+      {c.name}
+    </option>
+  ))}
+</CFormSelect>
+
 
   <CDropdown>
     <CDropdownToggle color="light" size="sm" className="border">
@@ -408,14 +534,26 @@ const Products = () => {
     <CTableDataCell>
   <div className="d-flex align-items-center gap-2">
 
-    <CAvatar
-      size="md"
-      src={
-        p.image
-          ? p.image
-          : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}`
-      }
-    />
+  <div className="position-relative">
+  <CAvatar
+    size="md"
+    src={
+      p.images?.[0]
+        ? p.images[0]
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}`
+    }
+  />
+
+  {p.images?.length > 1 && (
+    <span
+      className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-info"
+      style={{ fontSize: '10px' }}
+    >
+      +{p.images.length - 1}
+    </span>
+  )}
+</div>
+
 
 
     <div>
@@ -496,7 +634,7 @@ const Products = () => {
       </CTable>
 
       <CPagination align="center" className="mt-3">
-              {[...Array(Math.ceil(products.length / perPage)).keys()].map((n) => (
+              {[...Array(Math.ceil(filteredProducts.length / perPage)).keys()].map((n) => (
                 <CPaginationItem
                   key={n}
                   active={page === n + 1}
@@ -783,11 +921,40 @@ const Products = () => {
 
         {/* IMAGES */}
         <div className="row mb-3">
-          {selectedProduct.images?.map((img, i) => (
-            <div className="col-md-4 mb-2" key={i}>
-              <img src={img} alt="product" className="img-fluid rounded border" />
-            </div>
-          ))}
+        {form.images.length > 0 && (
+  <div className="row mt-3">
+    {form.images.map((img, i) =>
+      img ? (
+        <div className="col-md-3 mb-2" key={i}>
+          <div className="border rounded p-1 position-relative">
+
+            {/* ❌ DELETE ICON */}
+            <span
+              className="position-absolute top-0 end-0 m-1 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center"
+              style={{
+                width: 22,
+                height: 22,
+                fontSize: 14,
+                cursor: "pointer",
+                zIndex: 2
+              }}
+              onClick={() => handleDeleteImage(img, i)}
+            >
+              ×
+            </span>
+
+            <img
+              src={img}
+              alt="product"
+              style={{ height: 120, width: "100%", objectFit: "cover" }}
+            />
+          </div>
+        </div>
+      ) : null
+    )}
+  </div>
+)}
+
         </div>
 
         <h5 className="text-primary">Basic Info</h5>
