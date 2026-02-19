@@ -21,7 +21,7 @@ import {
     exportToPDF
   } from "../../utils/exportUtils"
   
-
+  import config from '../../config';
 import {
   getProducts, createProduct, updateProduct, getProductById,
   deleteProduct, toggleProductStatus
@@ -153,13 +153,17 @@ const Products = () => {
         let nextKey = null
       
         do {
-          const res = await getProducts({
-            pageSize: 100,   
-            lastKey: nextKey
-          })
+          const res = await getProducts({ pageSize: 100, lastKey: nextKey })
       
           if (res?.success) {
-            allProducts = [...allProducts, ...res.data]
+            const normalized = res.data.map(p => ({
+              ...p,
+              images: typeof p.images === "string"
+                ? JSON.parse(p.images)
+                : p.images
+            }))
+      
+            allProducts = [...allProducts, ...normalized]
             nextKey = res.pagination?.nextPageKey || null
           } else {
             nextKey = null
@@ -170,6 +174,7 @@ const Products = () => {
         setFilteredProducts(allProducts)
         setLoading(false)
       }
+      
       
       
 
@@ -197,7 +202,7 @@ const Products = () => {
     fetchCategories()
   }, [])
 
-
+ 
   const handleMultipleFileUpload = async (files) => {
     if (!files || files.length === 0) return
   
@@ -336,19 +341,17 @@ const Products = () => {
   const handleView = async (id) => {
     setDetailVisible(true)
     setSelectedProduct(null)
-    setDetailError(null)
     setDetailLoading(true)
   
     const res = await getProductById(id)
   
     if (res.success) {
       setSelectedProduct(res.data)
-    } else {
-      setDetailError(res.message || "Failed to load product")
     }
   
     setDetailLoading(false)
   }
+  
   
 
   const handleDelete = async (id) => {
@@ -396,35 +399,54 @@ const current = filteredProducts.slice(
   };
 
   const handleDeleteImage = async (imageUrl, index) => {
-    if (!window.confirm("Are you sure you want to delete this image?")) return;
+    const confirm = window.confirm("Are you sure you want to delete this image?");
+    if (!confirm) return;
+  
+    // ✅ Optimistic UI
+    const backupImages = [...form.images];
+    const updatedImages = form.images.filter((_, i) => i !== index);
+  
+    setForm(prev => ({
+      ...prev,
+      images: updatedImages
+    }));
   
     try {
-      // 🔍 Check S3 or not
-      if (isS3Image(imageUrl)) {
-        const s3Key = extractS3Key(imageUrl);
-  
-        if (s3Key) {
-          await fetch(
-            `${config.BASE_URL}/utils/files?s3Key=${encodeURIComponent(s3Key)}`,
-            { method: "DELETE" }
-          );
+      const res = await fetch(
+        `${config.BASE_URL}/products/${editId}/image`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl
+          })
         }
+      );
+  
+      const data = await res.json();
+  
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Delete failed");
       }
   
-      // 🧹 Always remove from DynamoDB (state)
-      const updatedImages = form.images.filter((_, i) => i !== index);
+    } catch (error) {
+      alert("Failed to delete image");
+      console.error(error);
   
+      // ❌ rollback on failure
       setForm(prev => ({
         ...prev,
-        images: updatedImages.length ? updatedImages : [""]
+        images: backupImages
       }));
-  
-    } catch (error) {
-      console.error("Image delete failed:", error);
-      alert("Failed to delete image");
     }
   };
   
+  
+  
+  const closeViewModal = () => {
+    setDetailVisible(false)
+    setSelectedProduct(null)
+  }
   
   
   
@@ -534,25 +556,17 @@ const current = filteredProducts.slice(
     <CTableDataCell>
   <div className="d-flex align-items-center gap-2">
 
-  <div className="position-relative">
+<div className="position-relative">
   <CAvatar
     size="md"
     src={
-      p.images?.[0]
-        ? p.images[0]
+      typeof p.image === "string" && p.image.trim() !== ""
+        ? p.image
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}`
     }
   />
-
-  {p.images?.length > 1 && (
-    <span
-      className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-info"
-      style={{ fontSize: '10px' }}
-    >
-      +{p.images.length - 1}
-    </span>
-  )}
 </div>
+
 
 
 
@@ -848,23 +862,58 @@ const current = filteredProducts.slice(
     </div>
   )}
 
-{form.images.length > 0 && (
-  <div className="row mt-3">
-    {form.images.map((img, i) =>
-      img ? (
-        <div className="col-md-3 mb-2" key={i}>
-          <div className="border rounded p-1 position-relative">
-            <img
-              src={img}
-              alt="product"
-              style={{ height: 120, width: "100%", objectFit: "cover" }}
-            />
-          </div>
+
+{/* IMAGES */}
+{/* {selectedProduct?.images?.length > 0 && (
+  <div className="row mb-3">
+    {selectedProduct.images.map((img, i) => (
+      <div className="col-md-3 mb-2" key={i}>
+        <div className="border rounded p-1">
+          <img
+            src={img}
+            alt="product"
+            style={{ height: 120, width: "100%", objectFit: "cover" }}
+          />
         </div>
-      ) : null
-    )}
+      </div>
+    ))}
+  </div>
+)} */}
+
+{/* IMAGES (EDIT MODE) */}
+{form.images?.length > 0 && (
+  <div className="row mb-3">
+    {form.images.map((img, i) => (
+      <div className="col-md-3 mb-2" key={i}>
+        <div className="border rounded p-1 position-relative">
+
+          {/* ❌ DELETE ICON */}
+          <span
+            className="position-absolute top-0 end-0 m-1 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center"
+            style={{
+              width: 22,
+              height: 22,
+              fontSize: 14,
+              cursor: "pointer",
+              zIndex: 2
+            }}
+            onClick={() => handleDeleteImage(img, i)}
+          >
+            ×
+          </span>
+
+          <img
+            src={img}
+            alt="product"
+            style={{ height: 120, width: "100%", objectFit: "cover" }}
+          />
+        </div>
+      </div>
+    ))}
   </div>
 )}
+
+
 
 
 </div>
@@ -921,28 +970,11 @@ const current = filteredProducts.slice(
 
         {/* IMAGES */}
         <div className="row mb-3">
-        {form.images.length > 0 && (
-  <div className="row mt-3">
-    {form.images.map((img, i) =>
-      img ? (
+  {selectedProduct?.images?.length > 0 && (
+    <div className="row mt-3">
+      {selectedProduct.images.map((img, i) => (
         <div className="col-md-3 mb-2" key={i}>
-          <div className="border rounded p-1 position-relative">
-
-            {/* ❌ DELETE ICON */}
-            <span
-              className="position-absolute top-0 end-0 m-1 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center"
-              style={{
-                width: 22,
-                height: 22,
-                fontSize: 14,
-                cursor: "pointer",
-                zIndex: 2
-              }}
-              onClick={() => handleDeleteImage(img, i)}
-            >
-              ×
-            </span>
-
+          <div className="border rounded p-1">
             <img
               src={img}
               alt="product"
@@ -950,12 +982,11 @@ const current = filteredProducts.slice(
             />
           </div>
         </div>
-      ) : null
-    )}
-  </div>
-)}
+      ))}
+    </div>
+  )}
+</div>
 
-        </div>
 
         <h5 className="text-primary">Basic Info</h5>
         <p><b>Name:</b> {selectedProduct.name}</p>
