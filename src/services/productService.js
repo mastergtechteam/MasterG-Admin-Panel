@@ -1,15 +1,41 @@
 import config from "../config"
 
-export const getProducts = async () => {
-  try {
-    const res = await fetch(`${config.BASE_URL}/products`)
-    const json = await res.json()
-    return json.data || []
-  } catch (error) {
-    console.error("Product API Error:", error)
-    return []
+export const getProducts = async ({
+    pageSize = 10,
+    lastKey = null,
+    categoryId = null
+  } = {}) => {
+    try {
+      const params = new URLSearchParams()
+  
+      params.append("pageSize", pageSize)
+  
+      if (lastKey) {
+        params.append("lastKey", lastKey)
+      }
+  
+      if (categoryId) {
+        params.append("categoryId", categoryId)
+      }
+  
+      const res = await fetch(
+        `${config.BASE_URL}/products?${params.toString()}`
+      )
+  
+      const json = await res.json()
+  
+      return json // ✅ full response (data + pagination)
+  
+    } catch (error) {
+      console.error("Product API Error:", error)
+      return {
+        success: false,
+        data: [],
+        pagination: {}
+      }
+    }
   }
-}
+  
 
 export const getProductById = async (id) => {
     try {

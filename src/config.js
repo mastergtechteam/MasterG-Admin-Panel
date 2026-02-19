@@ -6,4 +6,6 @@ const config = {
   
   export default config
   
-  
+  // https://2a0t2oahs8.execute-api.ap-south-1.amazonaws.com - dev
+
+  // https://uus4hd8rt5.execute-api.ap-south-1.amazonaws.com/ - prod
