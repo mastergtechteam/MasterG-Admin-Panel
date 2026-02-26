@@ -42,6 +42,8 @@ const Products = () => {
   const [pageSize, setPageSize] = useState(10)
   const [lastKey, setLastKey] = useState(null)
   const [hasMore, setHasMore] = useState(true)
+  const [nextKey, setNextKey] = useState(null)
+  const [prevKeys, setPrevKeys] = useState([])
 
   const [visible, setVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -50,6 +52,11 @@ const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState("")
   const [filteredProducts, setFilteredProducts] = useState([])
 
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentOffset, setCurrentOffset] = useState(0)
+
+  const start = totalCount === 0 ? 0 : currentOffset + 1
+  const end = Math.min(currentOffset + filteredProducts.length, totalCount)
 
   const [isEdit, setIsEdit] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -141,40 +148,38 @@ const Products = () => {
         },
       
         barcode: '',
-        images: [''],
+        images: [],
         status: 'ACTIVE'
       })
      
       
-      const fetchProducts = async () => {
+      const fetchProducts = async (key = null, categoryIdOverride = null) => {
         setLoading(true)
       
-        let allProducts = []
-        let nextKey = null
+        const res = await getProducts({
+          pageSize,
+          lastKey: key,
+          categoryId: categoryIdOverride ?? selectedCategory
+        })
       
-        do {
-          const res = await getProducts({ pageSize: 100, lastKey: nextKey })
+        if (res?.success) {
+          setProducts(res.data)
+          setFilteredProducts(res.data)
       
-          if (res?.success) {
-            const normalized = res.data.map(p => ({
-              ...p,
-              images: typeof p.images === "string"
-                ? JSON.parse(p.images)
-                : p.images
-            }))
+          setNextKey(res.pagination?.nextPageKey || null)
+          setTotalCount(res.totalCount || 0)
       
-            allProducts = [...allProducts, ...normalized]
-            nextKey = res.pagination?.nextPageKey || null
+          if (key) {
+            setPrevKeys(prev => [...prev, key])
+            setCurrentOffset(prev => prev + pageSize)
           } else {
-            nextKey = null
+            setPrevKeys([])
+            setCurrentOffset(0)
           }
-        } while (nextKey)
+        }
       
-        setProducts(allProducts)
-        setFilteredProducts(allProducts)
         setLoading(false)
       }
-      
       
       
 
@@ -185,22 +190,18 @@ const Products = () => {
 
   const handleCategoryFilter = (categoryId) => {
     setSelectedCategory(categoryId)
-    setPage(1) // pagination reset
-  
-    if (!categoryId) {
-      setFilteredProducts(products)
-    } else {
-      setFilteredProducts(
-        products.filter(p => p.category?.categoryId === categoryId)
-      )
-    }
+    setCurrentOffset(0)
+    setPrevKeys([])
+    fetchProducts(null, categoryId)
   }
+  
   
 
   useEffect(() => {
-    fetchProducts()
+    fetchProducts(null)
     fetchCategories()
   }, [])
+  
 
  
   const handleMultipleFileUpload = async (files) => {
@@ -265,7 +266,7 @@ const Products = () => {
       manufacturingDetails: prod.manufacturingDetails || { manufacturer:'', countryOfOrigin:'' },
       productType: prod.productType || 'GROCERY',
       barcode: prod.barcode || '',
-      images: prod.images?.length ? prod.images : [''],
+      images: Array.isArray(prod.images) ? prod.images : [],
       status: prod.status || 'ACTIVE'
     })
   
@@ -305,7 +306,7 @@ const Products = () => {
         expiry: { expiryRequired:false, expiryDate:'' },
         manufacturingDetails: { manufacturer:'', countryOfOrigin:'' },
         barcode: '',
-        images:[''],
+        images:[],
         status:'ACTIVE'
       }
       
@@ -325,6 +326,32 @@ const Products = () => {
       categoryName: selected.name
     })
   }
+
+  const exportAllProducts = async (type) => {
+    const res = await fetch(
+      `${config.BASE_URL}/products/export?categoryId=${selectedCategory || ""}`
+    )
+    const data = await res.json()
+  
+    if (!data.success || !data.data.length) {
+      alert("No data to export")
+      return
+    }
+  
+    const exportData = data.data.map(p => ({
+      Product_ID: p.productId,
+      Name: p.name,
+      Category: p.category?.name,
+      Selling_Price: p.pricing?.sellingPrice,
+      MRP: p.pricing?.mrp,
+      Status: p.status
+    }))
+  
+    if (type === "excel") exportToExcel(exportData, "Products")
+    if (type === "csv") exportToCSV(exportData, "Products")
+    if (type === "pdf") exportToPDF(Object.keys(exportData[0]), exportData, "Products")
+  }
+  
   
 
   const handleToggle = async (p) => {
@@ -351,8 +378,6 @@ const Products = () => {
   
     setDetailLoading(false)
   }
-  
-  
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this product?")) return
@@ -466,8 +491,30 @@ const current = filteredProducts.slice(
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value })
   
-  const handlePricingChange = (e) =>
-    setForm({ ...form, pricing: { ...form.pricing, [e.target.name]: e.target.value }})
+  const handlePricingChange = (e) => {
+    const { name, value } = e.target;
+  
+    setForm((prev) => {
+      const pricing = {
+        ...prev.pricing,
+        [name]: value ? Number(value) : 0,
+      };
+  
+      // Auto calculate discount %
+      if (pricing.mrp > 0 && pricing.sellingPrice > 0) {
+        pricing.discountPercentage = Number(
+          (((pricing.mrp - pricing.sellingPrice) / pricing.mrp) * 100).toFixed(2)
+        );
+      } else {
+        pricing.discountPercentage = 0;
+      }
+  
+      return {
+        ...prev,
+        pricing,
+      };
+    });
+  };
   
   
   const handleImageChange = (i, value) => {
@@ -511,18 +558,13 @@ const current = filteredProducts.slice(
     </CDropdownToggle>
 
     <CDropdownMenu>
-      <CDropdownItem onClick={() => exportToExcel(exportData, "Products")}>
+      <CDropdownItem onClick={() => exportAllProducts("excel")}>
         📗 Export Excel
       </CDropdownItem>
-      <CDropdownItem onClick={() => exportToCSV(exportData, "Products")}>
+      <CDropdownItem onClick={() => exportAllProducts("csv")}>
         📄 Export CSV
       </CDropdownItem>
-      <CDropdownItem
-        onClick={() => {
-          if (!exportData.length) return alert("No data to export")
-          exportToPDF(Object.keys(exportData[0]), exportData, "Products Report")
-        }}
-      >
+      <CDropdownItem onClick={() => exportAllProducts("pdf")}>
         📕 Export PDF
       </CDropdownItem>
     </CDropdownMenu>
@@ -647,17 +689,42 @@ const current = filteredProducts.slice(
 
       </CTable>
 
-      <CPagination align="center" className="mt-3">
-              {[...Array(Math.ceil(filteredProducts.length / perPage)).keys()].map((n) => (
-                <CPaginationItem
-                  key={n}
-                  active={page === n + 1}
-                  onClick={() => setPage(n + 1)}
-                >
-                  {n + 1}
-                </CPaginationItem>
-              ))}
-            </CPagination>
+
+      <div className="d-flex justify-content-between align-items-center mt-3">
+
+{/* LEFT: COUNT INFO */}
+<small className="text-body-secondary">
+  Showing <b>{start}</b> – <b>{end}</b> of <b>{totalCount}</b> products
+</small>
+
+{/* RIGHT: BUTTONS */}
+<div className="d-flex gap-2 mb-3">
+  <CButton
+    size="sm"
+    disabled={prevKeys.length === 0}
+    onClick={() => {
+      const prev = [...prevKeys]
+      const last = prev.pop()
+      setPrevKeys(prev)
+      setCurrentOffset(o => Math.max(o - pageSize, 0))
+      fetchProducts(last)
+    }}
+  >
+    ⬅ Previous
+  </CButton>
+
+  <CButton
+    size="sm"
+    disabled={!nextKey}
+    onClick={() => fetchProducts(nextKey)}
+  >
+    Next ➡
+  </CButton>
+</div>
+
+</div>
+
+
 
       {/* ADD / EDIT MODAL */}
       <CModal size="lg" visible={visible} onClose={()=>setVisible(false)}>
@@ -703,7 +770,8 @@ const current = filteredProducts.slice(
         <CFormInput label="Selling Price" type="number" name="sellingPrice" value={form.pricing.sellingPrice} onChange={handlePricingChange}/>
       </div>
       <div className="col-md-3">
-        <CFormInput label="Discount Percentage" type="number" name="discountPercentage" value={form.pricing.discountPercentage} onChange={handlePricingChange}/>
+        <CFormInput label="Discount Percentage" type="number" name="discountPercentage" value={form.pricing.discountPercentage}
+  readOnly onChange={handlePricingChange}/>
       </div>
       <div className="col-md-3">
         <CFormSelect label="Currency" name="currency" value={form.pricing.currency} onChange={handlePricingChange}>
@@ -881,22 +949,13 @@ const current = filteredProducts.slice(
 )} */}
 
 {/* IMAGES (EDIT MODE) */}
-{form.images?.length > 0 && (
+{form.images?.filter(Boolean).length > 0 && (
   <div className="row mb-3">
-    {form.images.map((img, i) => (
+    {form.images.filter(Boolean).map((img, i) => (
       <div className="col-md-3 mb-2" key={i}>
         <div className="border rounded p-1 position-relative">
-
-          {/* ❌ DELETE ICON */}
           <span
-            className="position-absolute top-0 end-0 m-1 bg-danger text-white rounded-circle d-flex align-items-center justify-content-center"
-            style={{
-              width: 22,
-              height: 22,
-              fontSize: 14,
-              cursor: "pointer",
-              zIndex: 2
-            }}
+            className="position-absolute top-0 end-0 ..."
             onClick={() => handleDeleteImage(img, i)}
           >
             ×
@@ -912,6 +971,7 @@ const current = filteredProducts.slice(
     ))}
   </div>
 )}
+
 
 
 
@@ -1027,7 +1087,7 @@ const current = filteredProducts.slice(
         <hr/>
 
         <h5 className="text-primary">Tax</h5>
-        <p><b>GST Applicable:</b> {selectedProduct.tax.gstApplicable}</p>
+        <p><b>GST Applicable:</b> {selectedProduct.tax?.gstApplicable}</p>
         <p><b>GST Percentage:</b>  {selectedProduct.tax?.gstPercentage} %</p>
         <hr/>
 

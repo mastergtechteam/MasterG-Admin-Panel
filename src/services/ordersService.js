@@ -20,3 +20,32 @@ export const getOrdersByRetailer = async (retailerId) => {
   )
   return res.json()
 }
+
+export const updateOrderStatus = async ({
+  orderId,
+  newStatus,
+  remark,
+  changedBy = "ADMIN"
+}) => {
+  try {
+    const res = await fetch(
+      `${config.BASE_URL}/api/v1/order/${orderId}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          newStatus,
+          remark,
+          changedBy
+        })
+      }
+    )
+
+    return await res.json()
+  } catch (err) {
+    console.error("Update Order Status Error:", err)
+    throw err
+  }
+}

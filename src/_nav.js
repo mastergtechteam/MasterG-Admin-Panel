@@ -13,7 +13,7 @@ import {
   cilPuzzle,
   cilSpeedometer,
   cilStar,
-  cilPeople,cilCart,cilUserFollow,cilTags, cilBadge
+  cilPeople,cilCart,cilUserFollow,cilTags, cilBadge,cilLocationPin
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -63,6 +63,18 @@ const _nav = [
     name: 'Orders',
     to: '/orders',
     icon: <CIcon icon={cilCart} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Price Changes',
+    to: '/price-changes',
+    icon: <CIcon icon={cilUserFollow} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Pincodes Manage',
+    to: '/pincodes',
+    icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,

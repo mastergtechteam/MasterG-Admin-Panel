@@ -7,6 +7,8 @@ const Products = React.lazy(() => import('./views/products/Products'))
 const Categories = React.lazy(() => import('./views/categories/Categories'))
 const Deals = React.lazy(() => import('./views/deals/Deals'))
 const Orders = React.lazy(() => import('./views/orders/Orders'))
+const PriceChanges = React.lazy(() => import('./views/priceChanges/PriceChanges'))
+const Pincodes = React.lazy(() => import('./views/pincodes/Pincodes'))
 const Roles = React.lazy(() => import('./views/roles/Roles'))
 const Colors = React.lazy(() => import('./views/theme/colors/Colors'))
 const Typography = React.lazy(() => import('./views/theme/typography/Typography'))
@@ -66,7 +68,9 @@ const routes = [
   { path: '/products', name: 'Products', element: Products },
   { path: '/categories', name: 'Categories', element: Categories },
   { path: '/deals', name: 'Deals', element: Deals },
-  { path: '/orders', name: 'Deals', element: Orders },
+  { path: '/orders', name: 'Orders', element: Orders },
+  { path: '/price-changes', name: 'PriceChanges', element: PriceChanges },
+  { path: '/pincodes', name: 'Pincodes', element: Pincodes },
   { path: '/roles', name: 'Roles', element: Roles },
   { path: '/theme', name: 'Theme', element: Colors, exact: true },
   { path: '/theme/colors', name: 'Colors', element: Colors },

@@ -12,6 +12,10 @@ import { cilCart, cilTrash, cilPencil, cilZoom, cilBadge, cilViewColumn } from '
 import { uploadToS3 } from '../../utils/fileUpload'
 import {getProducts} from '../../services/productService'
 
+import AsyncSelect from "react-select/async"
+import config from '../../config'
+
+
 import {
     getDeals,
     getDealsById,
@@ -28,6 +32,18 @@ const Deals = () => {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const perPage = 10
+
+  const [productOptions, setProductOptions] = useState([])
+  const [productNextKey, setProductNextKey] = useState(null)
+  const [productSearch, setProductSearch] = useState("")
+
+  const [selectOptions, setSelectOptions] = useState([])
+  const [options, setOptions] = useState([])
+  const [nextKey, setNextKey] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  
+
 
   const [visible, setVisible] = useState(false)
   const [detailVisible, setDetailVisible] = useState(false)
@@ -68,17 +84,80 @@ const Deals = () => {
         setDeals(data.filter(d => d.isDeleted === "false"))
         setLoading(false)
       }
+
+      const fetchProducts = async (lastKey = null) => {
+        let url = `${config.BASE_URL}/products/select?pageSize=20`
+        if (lastKey) {
+          url += `&lastKey=${encodeURIComponent(lastKey)}`
+        }
+      
+        const res = await fetch(url)
+        const data = await res.json()
+      
+        if (data.success) {
+          setOptions(prev => [...prev, ...data.data])
+          setNextKey(data.nextKey || null)
+        }
+      }
+      
       
 
 
   useEffect(() => {
     fetchDeals()
-    loadProducts()
+    fetchProducts()
   }, [])
 
-  const loadProducts = async () => {
-    const data = await getProducts()
-    setProducts(data)
+
+
+  const loadProductOptions = async (inputValue) => {
+    try {
+      const res = await fetch(
+        `${config.BASE_URL}/products/select?search=${encodeURIComponent(inputValue)}`
+      )
+      const data = await res.json()
+  
+      if (data.success && Array.isArray(data.data)) {
+        return data.data   // [{value, label}]
+      }
+      return []
+    } catch (e) {
+      console.error(e)
+      return []
+    }
+  }
+  
+
+  const fetchSelectProducts = async (search = "", lastKey = null) => {
+    const url = new URL(`${config.BASE_URL}/products/select`)
+    if (search) url.searchParams.append("search", search)
+    if (lastKey) url.searchParams.append("lastKey", lastKey)
+  
+    const res = await fetch(url)
+    const data = await res.json()
+  
+    if (data.success) {
+      setSelectOptions(prev =>
+        lastKey ? [...prev, ...data.data] : data.data
+      )
+      setNextKey(data.nextKey || null)
+    }
+  }
+  
+  
+  
+  const loadMoreProducts = async () => {
+    if (!productNextKey) return
+  
+    const res = await fetch(
+      `${config.BASE_URL}/products/select?search=${productSearch}&lastKey=${encodeURIComponent(productNextKey)}`
+    )
+    const data = await res.json()
+  
+    if (data.success) {
+      setProductOptions(prev => [...prev, ...data.data])
+      setProductNextKey(data.nextKey)
+    }
   }
   
   
@@ -101,10 +180,6 @@ const Deals = () => {
     setVisible(true)
   }
   
-  const productOptions = products.map(p => ({
-    value: p.productId,
-    label: p.name
-  }))
 
   const handleSubmit = async () => {
     if (!form.heading) {
@@ -356,60 +431,82 @@ const Deals = () => {
         onChange={(e) => setForm({ ...form, isBanner: e.target.checked })}
         />
 
-<label className="form-label">Select Products</label>
+{/* <label className="form-label">Select Products</label>
+
+<AsyncSelect
+  isMulti
+  cacheOptions
+  defaultOptions
+  loadOptions={loadProductOptions}
+  placeholder="Search products..."
+
+  styles={{
+    control: (base) => ({ ...base, backgroundColor: "#fff" }),
+    menu: (base) => ({ ...base, backgroundColor: "#fff", zIndex: 9999 }),
+    option: (base, s) => ({
+      ...base,
+      backgroundColor: s.isFocused ? "#e9ecef" : "#fff",
+      color: "#000",
+    }),
+    multiValue: (b) => ({ ...b, backgroundColor: "#e7f1ff" }),
+    multiValueLabel: (b) => ({ ...b, color: "#000" }),
+    input: (b) => ({ ...b, color: "#000" }),
+  }}
+
+  value={form.items.map(id => ({
+    value: id,
+    label: id
+  }))}
+
+  onChange={(selected) =>
+    setForm({
+      ...form,
+      items: selected ? selected.map(s => s.value) : []
+    })
+  }
+/> */}
+
 <Select
   isMulti
-  options={productOptions}
-  className='mb-2' 
-  value={productOptions.filter(o => form.items.includes(o.value))}
-  onChange={(selected) =>
-    setForm({ ...form, items: selected ? selected.map(s => s.value) : [] })
-  }
-  styles={{
-    control: (base) => ({
-      ...base,
-      backgroundColor: "#fff",
-      borderColor: "#ced4da",
-      color: "#000",
-    }),
-    menu: (base) => ({
-      ...base,
-      backgroundColor: "#fff",
-      color: "#000",
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isFocused ? "#e9ecef" : "#fff",
-      color: "#000",
-    }),
-    multiValue: (base) => ({
-      ...base,
-      backgroundColor: "#e7f1ff",
-    }),
-    multiValueLabel: (base) => ({
-      ...base,
-      color: "#000",
-      fontWeight: 500,
-    }),
-    input: (base) => ({
-      ...base,
-      color: "#000",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "#6c757d",
-    }),
-    singleValue: (base) => ({
-      ...base,
-      color: "#000",
-    }),
+  options={options}
+  isLoading={loadingMore}
+  placeholder="Select products..."
+
+  onMenuScrollToBottom={async () => {
+    if (!nextKey || loadingMore) return
+    setLoadingMore(true)
+    await fetchProducts(nextKey)
+    setLoadingMore(false)
   }}
+
+  styles={{
+    control: (base) => ({ ...base, backgroundColor: "#fff" }),
+    menu: (base) => ({ ...base, backgroundColor: "#fff", zIndex: 9999 }),
+    option: (base, s) => ({
+      ...base,
+      backgroundColor: s.isFocused ? "#e9ecef" : "#fff",
+      color: "#000",
+    }),
+    multiValue: (b) => ({ ...b, backgroundColor: "#e7f1ff" }),
+    multiValueLabel: (b) => ({ ...b, color: "#000" }),
+    input: (b) => ({ ...b, color: "#000" }),
+  }}
+
+  value={form.items.map(id => ({
+    value: id,
+    label: id
+  }))}
+
+  onChange={(selected) =>
+    setForm({
+      ...form,
+      items: selected ? selected.map(s => s.value) : []
+    })
+  }
 />
 
 
 
-
-   
 
   </CModalBody>
 

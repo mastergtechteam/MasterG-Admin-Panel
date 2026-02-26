@@ -8,7 +8,7 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilViewColumn, cilCart } from "@coreui/icons"
 
-import {getOrders} from '../../services/ordersService'
+import {getOrders,updateOrderStatus} from '../../services/ordersService'
 
 const Orders = () => {
   const [orders, setOrders] = useState([])
@@ -57,6 +57,38 @@ const Orders = () => {
     DELIVERED: "success",
     CANCELLED: "danger"
   }[s] || "light")
+
+  const ORDER_FLOW = [
+    "PLACED","ACCEPTED","REJECTED",
+    "PACKED","OUT_FOR_DELIVERY",
+    "DELIVERED","CANCELLED","FAILED"
+  ]
+  
+  const getNextStatuses = (current) => {
+    const idx = ORDER_FLOW.indexOf(current)
+    if (["DELIVERED","CANCELLED","FAILED","REJECTED"].includes(current)) return []
+  
+    return [
+      ORDER_FLOW[idx + 1],
+      "CANCELLED",
+      "REJECTED"
+    ].filter(Boolean)
+  }
+
+  const handleStatusUpdate = async () => {
+    try {
+      await updateOrderStatus({
+        orderId: selectedOrder.orderId,
+        newStatus: selectedOrder.nextStatus,
+        remark: selectedOrder.remark
+      })
+  
+      await fetchOrders()          // ✅ refresh list
+      setDetailVisible(false)      // ✅ close modal
+    } catch (err) {
+      alert(err.message || "Failed to update status")
+    }
+  }
 
   if (loading) return <CSpinner color="primary" />
 
@@ -141,6 +173,42 @@ const Orders = () => {
               <p><b>Delivery:</b> ₹{selectedOrder.billing.deliveryCharge}</p>
               <p><b>Tax:</b> ₹{selectedOrder.billing.tax}</p>
               <h5>Grand Total: ₹{selectedOrder.billing.grandTotal}</h5>
+
+              <hr />
+
+              <h6 className="mt-3">Change Order Status</h6>
+
+<select
+  className="form-select mb-2"
+  onChange={(e) =>
+    setSelectedOrder({
+      ...selectedOrder,
+      nextStatus: e.target.value
+    })
+  }
+>
+  <option value="">Select Status</option>
+  {getNextStatuses(selectedOrder.orderStatus).map(s => (
+    <option key={s} value={s}>{s}</option>
+  ))}
+</select>
+
+{["CANCELLED","REJECTED","FAILED"].includes(selectedOrder.nextStatus) && (
+  <textarea
+    className="form-control mb-2"
+    placeholder="Enter remark"
+    onChange={(e) =>
+      setSelectedOrder({
+        ...selectedOrder,
+        remark: e.target.value
+      })
+    }
+  />
+)}
+
+<CButton color="primary" onClick={handleStatusUpdate}>
+  Update Status
+</CButton>
             </>
           )}
         </CModalBody>
