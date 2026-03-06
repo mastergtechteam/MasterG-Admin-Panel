@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
-
+import ApiAnalytics from './ApiAnalytics'
 import {
   CRow,
   CCol,
@@ -43,7 +43,7 @@ const WidgetsDropdown = (props) => {
 
         setCounts({
           retailers: retailers?.count ?? retailers.length ?? 0,
-          products: products?.count ?? products.length ?? 0,
+          products: products?.totalCount ?? products.length ?? 0,
           categories: categories?.count ?? categories.length ?? 0,
           deals: deals?.count ?? deals.length ?? 0,
         })
@@ -68,25 +68,36 @@ const WidgetsDropdown = (props) => {
   }, [])
 
   return (
-    <CRow className={props.className} xs={{ gutter: 4 }}>
-      <CCol sm={6} xl={4} xxl={3}>
-        <CWidgetStatsA color="primary" value={counts.retailers} title="Retailers" />
-      </CCol>
+    <>
+      {/* 🔹 Top Widgets */}
+      <CRow className={props.className} xs={{ gutter: 4 }}>
+        <CCol sm={6} xl={4} xxl={3}>
+          <CWidgetStatsA color="primary" value={counts.retailers} title="Retailers" />
+        </CCol>
 
-      <CCol sm={6} xl={4} xxl={3}>
-        <CWidgetStatsA color="info" value={counts.products} title="Products" />
-      </CCol>
+        <CCol sm={6} xl={4} xxl={3}>
+          <CWidgetStatsA color="info" value={counts.products} title="Products" />
+        </CCol>
 
-      <CCol sm={6} xl={4} xxl={3}>
-        <CWidgetStatsA color="warning" value={counts.categories} title="Categories" />
-      </CCol>
+        <CCol sm={6} xl={4} xxl={3}>
+          <CWidgetStatsA color="warning" value={counts.categories} title="Categories" />
+        </CCol>
 
-      <CCol sm={6} xl={4} xxl={3}>
-        <CWidgetStatsA color="danger" value={counts.deals} title="Deals" />
-      </CCol>
-    </CRow>
+        <CCol sm={6} xl={4} xxl={3}>
+          <CWidgetStatsA color="danger" value={counts.deals} title="Deals" />
+        </CCol>
+      </CRow>
+
+      {/* 🔹 API Analytics Section */}
+      <div className="mt-4">
+        <ApiAnalytics />
+      </div>
+    </>
   )
+  
 }
+
+
 
 WidgetsDropdown.propTypes = {
   className: PropTypes.string,
