@@ -2,7 +2,13 @@ import config from "../config"
 
 export const getCategories = async () => {
   try {
-    const res = await fetch(`${config.BASE_URL}/categories`)
+    const res = await fetch(`${config.BASE_URL}/categories`, {
+      headers: {
+        "Content-Type": "application/json",
+        "X-App-Type": "pro" 
+      }
+    })
+
     const json = await res.json()
     return json.data || []
   } catch (error) {
