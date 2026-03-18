@@ -1,22 +1,36 @@
 import config from "../config"
 
-export const getOrders = async () => {
+export const getOrders = async ({ pageSize = 10, lastKey = null } = {}) => {
   try {
-    const res = await fetch(`${config.BASE_URL}/api/v1/order`)
+    const url = `${config.BASE_URL}/api/v1/order?pageSize=${pageSize}${
+      lastKey ? `&lastKey=${lastKey}` : ""
+    }`
+
+    const res = await fetch(url, {
+      headers: {
+        "X-App-Type": "pro"
+      }
+    })
+
     const json = await res.json()
 
     console.log("Orders API RESPONSE:", json)
 
-    return Array.isArray(json.data) ? json.data : []
+    return json // 🔥 pura response return karo
   } catch (error) {
     console.error("Orders API Error:", error)
-    return []
+    return { success: false, data: [] }
   }
 }
 
 export const getOrdersByRetailer = async (retailerId) => {
   const res = await fetch(
-    `${config.BASE_URL}/api/v1/order?retailerId=${retailerId}`
+    `${config.BASE_URL}/api/v1/order?retailerId=${retailerId}`,
+    {
+      headers: {
+        "X-App-Type": "pro"
+      }
+    }
   )
   return res.json()
 }

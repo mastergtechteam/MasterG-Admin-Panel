@@ -16,6 +16,13 @@ const Orders = () => {
   const [page, setPage] = useState(1)
   const [detailVisible, setDetailVisible] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [lastKey, setLastKey] = useState(null)
+
+  const [pageSize] = useState(10)
+  const [nextKey, setNextKey] = useState(null)
+  const [prevKeys, setPrevKeys] = useState([])
+  const [currentOffset, setCurrentOffset] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
 
   const perPage = 10
 
@@ -29,25 +36,33 @@ const Orders = () => {
       minute: "2-digit"
     })
 
-  const fetchOrders = async () => {
-    setLoading(true)
-    const res = await getOrders()
-    setOrders(res) 
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrders = async (key = null) => {
       setLoading(true)
-      const res = await getOrders()
-      setOrders(res)
+    
+      const res = await getOrders({
+        pageSize: 10,
+        lastKey: key
+      })
+    
+      if (res?.success) {
+    
+        setOrders(res.data)
+    
+        // store current key
+        setLastKey(key)
+    
+        // next key
+        setNextKey(res.pagination?.nextPageKey || null)
+    
+      }
+    
       setLoading(false)
     }
-    fetchOrders()
-  }, [])
-  
 
-  const current = orders.slice((page - 1) * perPage, page * perPage)
+    useEffect(() => {
+      fetchOrders(null)
+    }, [])
+  
 
   const statusColor = (s) => ({
     PLACED: "secondary",
@@ -111,10 +126,32 @@ const Orders = () => {
         </CTableHead>
 
         <CTableBody>
-          {current.map(o => (
+          {orders.map(o => (
             <CTableRow key={o.orderId}>
               <CTableDataCell>{o.orderId}</CTableDataCell>
-              <CTableDataCell>{o.retailerId}</CTableDataCell>
+              <CTableDataCell>
+  <div className="d-flex align-items-center gap-2">
+
+    <img
+      src={o.retailer?.shop_image}
+      alt="shop"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: "50%",
+        objectFit: "cover"
+      }}
+    />
+
+    <div>
+      <div><b>{o.retailer?.storeName || "N/A"}</b></div>
+      <small className="text-muted">
+        {o.retailer?.ownerName}
+      </small>
+    </div>
+
+  </div>
+</CTableDataCell>
               <CTableDataCell>{o.items.length}</CTableDataCell>
               <CTableDataCell>₹ {o.billing.grandTotal}</CTableDataCell>
               <CTableDataCell>
@@ -141,17 +178,43 @@ const Orders = () => {
         </CTableBody>
       </CTable>
 
-      <CPagination align="center" className="mt-3">
-        {[...Array(Math.ceil(orders.length / perPage)).keys()].map(n => (
-          <CPaginationItem
-            key={n}
-            active={page === n + 1}
-            onClick={() => setPage(n + 1)}
-          >
-            {n + 1}
-          </CPaginationItem>
-        ))}
-      </CPagination>
+      <div className="d-flex justify-content-between align-items-center mt-3">
+
+<small>
+  Showing {currentOffset + 1} – {currentOffset + orders.length}
+</small>
+
+<div className="d-flex gap-2">
+<CButton
+  size="sm"
+  disabled={prevKeys.length === 0}
+  onClick={() => {
+    const prev = [...prevKeys]
+    const previousKey = prev.pop()
+
+    setPrevKeys(prev)
+    setCurrentOffset(o => Math.max(o - pageSize, 0))
+
+    fetchOrders(previousKey || null) 
+  }}
+>
+  ⬅ Previous
+</CButton>
+
+  <CButton
+  size="sm"
+  disabled={!nextKey}
+  onClick={() => {
+    setPrevKeys(prev => [...prev, lastKey]) // ✅ correct
+    setCurrentOffset(o => o + pageSize)
+    fetchOrders(nextKey)
+  }}
+>
+  Next ➡
+</CButton>
+</div>
+
+</div>
 
       {/* ORDER DETAIL MODAL */}
       <CModal size="lg" visible={detailVisible} onClose={() => setDetailVisible(false)}>
@@ -209,6 +272,35 @@ const Orders = () => {
 <CButton color="primary" onClick={handleStatusUpdate}>
   Update Status
 </CButton>
+
+<hr />
+<h6>Retailer Details</h6>
+
+<div className="border p-2 mb-2">
+  <p><b>Store:</b> {selectedOrder.retailer?.storeName}</p>
+  <p><b>Owner:</b> {selectedOrder.retailer?.ownerName}</p>
+  <p><b>Mobile:</b> {selectedOrder.retailer?.contact?.mobile}</p>
+  <p><b>Email:</b> {selectedOrder.retailer?.contact?.email}</p>
+</div>
+
+<hr />
+<h6>Delivery Address</h6>
+
+<div className="border p-2 mb-2">
+  <p>{selectedOrder.delivery?.address?.line1}</p>
+  <p>
+    {selectedOrder.delivery?.address?.area},{" "}
+    {selectedOrder.delivery?.address?.city}
+  </p>
+  <p>
+    {selectedOrder.delivery?.address?.state} -{" "}
+    {selectedOrder.delivery?.address?.pincode}
+  </p>
+</div>
+<hr />
+<a href={`tel:${selectedOrder.retailer?.contact?.mobile}`}>
+  📞 Call Retailer
+</a>
             </>
           )}
         </CModalBody>

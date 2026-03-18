@@ -5,11 +5,15 @@ export const getCategories = async () => {
     const res = await fetch(`${config.BASE_URL}/categories`, {
       headers: {
         "Content-Type": "application/json",
-        "X-App-Type": "pro" 
+        "X-App-Type": "pro"
       }
     })
 
+    if (!res.ok) throw new Error("API failed")
+
     const json = await res.json()
+    console.log("API RESPONSE:", json)
+
     return json.data || []
   } catch (error) {
     console.error("Category API Error:", error)
