@@ -12,8 +12,7 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilCart, cilTrash, cilPencil, cilZoom, cilViewColumn,
-    cilCloudDownload,
-    cilPlus } from '@coreui/icons'
+    cilCloudDownload, cilPlus, cilCloudUpload } from '@coreui/icons'
 
 import {
     exportToCSV,
@@ -29,6 +28,7 @@ import {
 
 import { getCategories } from '../../services/categoryService'
 import { uploadToS3 } from '../../utils/fileUpload'
+import * as XLSX from "xlsx";
 
 
   
@@ -202,7 +202,60 @@ const Products = () => {
     fetchCategories()
   }, [])
   
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+  
+    const reader = new FileReader();
+  
+    reader.onload = async (evt) => {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+  
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
+  
+      console.log("Excel Data:", jsonData);
+  
+      await fetch(`${config.IMPORT_API}/admin/products/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: jsonData })
+      });
+  
+      alert("Import successful");
+    };
+  
+    reader.readAsArrayBuffer(file);
+  };
 
+  const downloadSampleExcel = () => {
+    const sampleData = [{
+      name: "Sample Product",
+      brand: "BrandX",
+      categoryId: "CAT123",
+      categoryName: "Category Name",
+      subCategory: "SubCat",
+      description: "Sample desc",
+      mrp: 100,
+      sellingPrice: 90,
+      unit: "PCS",
+      value: 1,
+      stock: 50,
+      minimumThreshold: 5,
+      gstApplicable: true,
+      gstPercentage: 18,
+      productType: "PACKAGED",
+      expiryRequired: false,
+      expiryDate: "",
+      manufacturer: "ABC Pvt Ltd",
+      countryOfOrigin: "India",
+      barcode: "123456",
+      status: "ACTIVE"
+    }];
+  
+    exportToExcel(sampleData, "Sample_Product_Import");
+  };
  
   const handleMultipleFileUpload = async (files) => {
     if (!files || files.length === 0) return
@@ -574,6 +627,36 @@ const current = filteredProducts.slice(
     <CIcon icon={cilPlus} className="me-1" />
     Add Product
   </CButton>
+
+  <CDropdown>
+  <CDropdownToggle color="light" size="sm" className="border">
+    <CIcon icon={cilCloudUpload} className="me-1" />
+    Import
+  </CDropdownToggle>
+
+  <CDropdownMenu>
+
+    <CDropdownItem
+      onClick={() => document.getElementById("excelUpload").click()}
+    >
+      📗 Import Excel
+    </CDropdownItem>
+
+    <CDropdownItem onClick={downloadSampleExcel}>
+      📥 Download Sample
+    </CDropdownItem>
+
+  </CDropdownMenu>
+</CDropdown>
+
+{/* Hidden File Input */}
+<input
+  type="file"
+  id="excelUpload"
+  accept=".xlsx, .xls"
+  style={{ display: "none" }}
+  onChange={handleExcelUpload}
+/>
 
 </div>
 </div>

@@ -241,20 +241,21 @@ const Orders = () => {
 
               <h6 className="mt-3">Change Order Status</h6>
 
-<select
-  className="form-select mb-2"
-  onChange={(e) =>
-    setSelectedOrder({
-      ...selectedOrder,
-      nextStatus: e.target.value
-    })
-  }
->
-  <option value="">Select Status</option>
-  {getNextStatuses(selectedOrder.orderStatus).map(s => (
-    <option key={s} value={s}>{s}</option>
-  ))}
-</select>
+              <select
+                className="form-select mb-2"
+                value={selectedOrder.nextStatus || ""}
+                onChange={(e) =>
+                  setSelectedOrder({
+                    ...selectedOrder,
+                    nextStatus: e.target.value
+                  })
+                }
+              >
+                <option value="">Select Status</option>
+                {ORDER_FLOW.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
 
 {["CANCELLED","REJECTED","FAILED"].includes(selectedOrder.nextStatus) && (
   <textarea
