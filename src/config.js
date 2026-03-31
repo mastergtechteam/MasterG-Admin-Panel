@@ -13,3 +13,4 @@ export default config
 
   // https://uqlzs7e7wj.execute-api.ap-south-1.amazonaws.com - now 
 
+// https://dprrurhjt2.execute-api.ap-south-1.amazonaws.com/

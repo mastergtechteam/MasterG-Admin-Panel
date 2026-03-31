@@ -9,6 +9,8 @@ const Deals = React.lazy(() => import('./views/deals/Deals'))
 const Orders = React.lazy(() => import('./views/orders/Orders'))
 const PriceChanges = React.lazy(() => import('./views/priceChanges/PriceChanges'))
 const Pincodes = React.lazy(() => import('./views/pincodes/Pincodes'))
+const TimeSlots = React.lazy(() => import('./views/dilavery/TimeSlots'))
+const AppConfig = React.lazy(() => import('./views/appConfig/AppConfig'))
 const Roles = React.lazy(() => import('./views/roles/Roles'))
 const Colors = React.lazy(() => import('./views/theme/colors/Colors'))
 const Typography = React.lazy(() => import('./views/theme/typography/Typography'))
@@ -71,6 +73,8 @@ const routes = [
   { path: '/orders', name: 'Orders', element: Orders },
   { path: '/price-changes', name: 'PriceChanges', element: PriceChanges },
   { path: '/pincodes', name: 'Pincodes', element: Pincodes },
+  { path: '/dilavery-time-slots', name: 'TimeSlots', element: TimeSlots },
+  { path: '/app-Config', name: 'AppConfig', element: AppConfig },
   { path: '/roles', name: 'Roles', element: Roles },
   { path: '/theme', name: 'Theme', element: Colors, exact: true },
   { path: '/theme/colors', name: 'Colors', element: Colors },

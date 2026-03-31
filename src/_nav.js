@@ -13,7 +13,8 @@ import {
   cilPuzzle,
   cilSpeedometer,
   cilStar,
-  cilPeople,cilCart,cilUserFollow,cilTags, cilBadge,cilLocationPin
+  cilPeople,cilCart,cilUserFollow,cilTags, cilBadge,cilLocationPin,
+  cilClock
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -75,6 +76,18 @@ const _nav = [
     name: 'Pincodes Manage',
     to: '/pincodes',
     icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Dilavery time slots',
+    to: '/dilavery-time-slots',
+    icon: <CIcon icon={cilClock} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'AppConfig',
+    to: '/app-config',
+    icon: <CIcon icon={cilClock} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,

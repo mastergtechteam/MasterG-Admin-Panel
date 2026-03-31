@@ -8,6 +8,12 @@ import './scss/style.scss'
 // We use those styles to show code examples, you should remove them in your application.
 import './scss/examples.scss'
 
+const PrivateRoute = ({ children }) => {
+  const token = localStorage.getItem("accessToken");
+
+  return token ? children : <Login />;
+};
+
 // Containers
 const DefaultLayout = React.lazy(() => import('./layout/DefaultLayout'))
 
@@ -45,12 +51,26 @@ const App = () => {
         }
       >
         <Routes>
-          <Route exact path="/login" name="Login Page" element={<Login />} />
-          <Route exact path="/register" name="Register Page" element={<Register />} />
-          <Route exact path="/404" name="Page 404" element={<Page404 />} />
-          <Route exact path="/500" name="Page 500" element={<Page500 />} />
-          <Route path="*" name="Home" element={<DefaultLayout />} />
-        </Routes>
+  {/* Default → login */}
+  <Route path="/" element={<Login />} />
+
+  {/* Public */}
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+
+  {/* Protected */}
+  <Route
+    path="/*"
+    element={
+      <PrivateRoute>
+        <DefaultLayout />
+      </PrivateRoute>
+    }
+  />
+
+  <Route path="/404" element={<Page404 />} />
+  <Route path="/500" element={<Page500 />} />
+</Routes>
       </Suspense>
     </HashRouter>
   )
