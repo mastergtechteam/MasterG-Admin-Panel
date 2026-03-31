@@ -23,6 +23,7 @@ const Orders = () => {
   const [prevKeys, setPrevKeys] = useState([])
   const [currentOffset, setCurrentOffset] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [groupedOrders, setGroupedOrders] = useState({})
 
   const perPage = 10
 
@@ -35,6 +36,27 @@ const Orders = () => {
       hour: "2-digit",
       minute: "2-digit"
     })
+
+    const groupOrders = (orders) => {
+      const grouped = {}
+    
+      orders.forEach(order => {
+        const date = new Date(order.createdAt).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric"
+        })
+    
+        const slot = order.delivery?.timeSlot?.label || "No Slot"
+    
+        if (!grouped[date]) grouped[date] = {}
+        if (!grouped[date][slot]) grouped[date][slot] = []
+    
+        grouped[date][slot].push(order)
+      })
+    
+      return grouped
+    }
 
     const fetchOrders = async (key = null) => {
       setLoading(true)
@@ -53,6 +75,9 @@ const Orders = () => {
     
         // next key
         setNextKey(res.pagination?.nextPageKey || null)
+
+        const grouped = groupOrders(res.data)
+        setGroupedOrders(grouped)
     
       }
     
@@ -111,72 +136,82 @@ const Orders = () => {
     <>
       <h4 className="mb-3">Orders</h4>
 
-      <CTable align="middle" className="mb-0 border" hover responsive>
-        <CTableHead>
-          <CTableRow>
-            <CTableHeaderCell className='text-center'> <CIcon icon={cilCart} /> Order ID</CTableHeaderCell>
-            <CTableHeaderCell>Retailer</CTableHeaderCell>
-            <CTableHeaderCell>Items</CTableHeaderCell>
-            <CTableHeaderCell>Total</CTableHeaderCell>
-            <CTableHeaderCell>Status</CTableHeaderCell>
-            <CTableHeaderCell>Payment</CTableHeaderCell>
-            <CTableHeaderCell>Created</CTableHeaderCell>
-            <CTableHeaderCell></CTableHeaderCell>
-          </CTableRow>
-        </CTableHead>
+      {Object.keys(groupedOrders).map(date => (
+  <div key={date} className="mb-4">
 
-        <CTableBody>
-          {orders.map(o => (
-            <CTableRow key={o.orderId}>
-              <CTableDataCell>{o.orderId}</CTableDataCell>
-              <CTableDataCell>
-  <div className="d-flex align-items-center gap-2">
+    <h5 className="bg-light text-black p-2 rounded ">📅 {date}</h5>
 
-    <img
-      src={o.retailer?.shop_image}
-      alt="shop"
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        objectFit: "cover"
-      }}
-    />
+    {Object.keys(groupedOrders[date]).map(slot => (
+      <div key={slot} className="mb-3">
 
-    <div>
-      <div><b>{o.retailer?.storeName || "N/A"}</b></div>
-      <small className="text-muted">
-        {o.retailer?.ownerName}
-      </small>
-    </div>
+        <h6 className="text-primary">
+          ⏰ {slot} ({groupedOrders[date][slot].length} orders)
+        </h6>
 
-  </div>
-</CTableDataCell>
-              <CTableDataCell>{o.items.length}</CTableDataCell>
-              <CTableDataCell>₹ {o.billing.grandTotal}</CTableDataCell>
-              <CTableDataCell>
-                <CBadge color={statusColor(o.orderStatus)}>
-                  {o.orderStatus}
-                </CBadge>
-              </CTableDataCell>
-              <CTableDataCell>
-                {o.payment.mode} ({o.payment.status})
-              </CTableDataCell>
-              <CTableDataCell>{formatIST(o.createdAt)}</CTableDataCell>
-              <CTableDataCell>
-                <CIcon
-                  icon={cilViewColumn}
-                  className="text-primary cursor-pointer"
-                  onClick={() => {
-                    setSelectedOrder(o)
-                    setDetailVisible(true)
-                  }}
-                />
-              </CTableDataCell>
+        <CTable align="middle" className="mb-0 border" hover responsive>
+          <CTableHead>
+            <CTableRow>
+              <CTableHeaderCell>Order ID</CTableHeaderCell>
+              <CTableHeaderCell>Retailer</CTableHeaderCell>
+              <CTableHeaderCell>Items</CTableHeaderCell>
+              <CTableHeaderCell>Total</CTableHeaderCell>
+              <CTableHeaderCell>Status</CTableHeaderCell>
+              <CTableHeaderCell>Payment</CTableHeaderCell>
+              <CTableHeaderCell>Created</CTableHeaderCell>
+              <CTableHeaderCell>Action</CTableHeaderCell>
             </CTableRow>
-          ))}
-        </CTableBody>
-      </CTable>
+          </CTableHead>
+
+          <CTableBody>
+            {groupedOrders[date][slot].map(o => (
+              <CTableRow key={o.orderId}>
+                <CTableDataCell>{o.orderId}</CTableDataCell>
+
+                <CTableDataCell>
+                  <b>{o.retailer?.storeName}</b>
+                  <br />
+                  <small>{o.retailer?.ownerName}</small>
+                </CTableDataCell>
+
+                <CTableDataCell>{o.items.length}</CTableDataCell>
+
+                <CTableDataCell>
+                  ₹ {o.billing.grandTotal}
+                </CTableDataCell>
+
+                <CTableDataCell>
+                  <CBadge color={statusColor(o.orderStatus)}>
+                    {o.orderStatus}
+                  </CBadge>
+                </CTableDataCell>
+
+                <CTableDataCell>
+                  {o.payment.mode}
+                </CTableDataCell>
+
+                <CTableDataCell>
+                  {formatIST(o.createdAt)}
+                </CTableDataCell>
+
+                <CTableDataCell>
+                  <CIcon
+                    icon={cilViewColumn}
+                    className="text-primary cursor-pointer"
+                    onClick={() => {
+                      setSelectedOrder(o)
+                      setDetailVisible(true)
+                    }}
+                  />
+                </CTableDataCell>
+              </CTableRow>
+            ))}
+          </CTableBody>
+        </CTable>
+
+      </div>
+    ))}
+  </div>
+))}
 
       <div className="d-flex justify-content-between align-items-center mt-3">
 

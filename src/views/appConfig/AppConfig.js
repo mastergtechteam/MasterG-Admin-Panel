@@ -49,7 +49,7 @@ const AppConfig = () => {
       <CCardHeader className="d-flex justify-content-between">
         <h5>App Config</h5>
         {!isEdit ? (
-          <CButton size="sm" onClick={() => setIsEdit(true)}>
+          <CButton color="primary" size="sm" onClick={() => setIsEdit(true)}>
             Edit
           </CButton>
         ) : (
